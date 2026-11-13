@@ -1,0 +1,51 @@
+name: Redaction contribution validation
+on:
+  push:
+    branches: [validation/redact-7178]
+permissions:
+  contents: read
+jobs:
+  validate:
+    uses: storytold/craft-common-actions/.github/workflows/gate.yml@main
+    with:
+      os: '["ubuntu-24.04"]'
+      craft-fonts-ref: b076417b5880bd4154bd22f00695b1d28c6bea83
+      packages: libxkbcommon-dev libwayland-dev libx11-dev libxrandr-dev libxi-dev libgl1-mesa-dev libgtk-3-dev qpdf poppler-utils
+      tools: ''
+      command: |
+        cargo fmt --all
+        echo 'FORMATTING PATCH START'
+        git diff -- crates/redact
+        echo 'FORMATTING PATCH END'
+        cargo clippy --locked -p pdfcraft-redact --all-targets -- -D warnings
+        cargo test --locked -p pdfcraft-redact
+        cp crates/redact/src/lib.rs /tmp/redaction-fixed.rs
+        python3 - <<'PY'
+        from pathlib import Path
+        import re, subprocess
+        p = Path('crates/redact/src/lib.rs')
+        fixed = p.read_text()
+        old = subprocess.check_output(['git', 'show', '175992b5a:crates/redact/src/lib.rs']).decode()
+        pattern = r'pub\(crate\) fn rect_of\(.*?\n\}'
+        old_rect = re.search(pattern, old, re.S).group()
+        broken = re.sub(pattern, lambda _: old_rect, fixed, count=1, flags=re.S)
+        start = broken.index('        // Unknown geometry is not evidence')
+        end = broken.index('            match r {', start)
+        broken = broken[:start] + '        if rect_of(doc, d.get(b"Rect")).is_some_and(|b| rects.iter().any(|x| pdfcraft_content::overlaps(*x, b, 0.0))) {\n' + broken[end:]
+        p.write_text(broken)
+        PY
+        set +e
+        cargo test --locked -p pdfcraft-redact --lib annotation_geometry > /tmp/redaction-before.log 2>&1
+        red_status=$?
+        set -e
+        cat /tmp/redaction-before.log
+        cp /tmp/redaction-fixed.rs crates/redact/src/lib.rs
+        test "$red_status" -eq 101
+        grep -q 'annotation_rectangles_do_not_skip_non_numeric_entries ... FAILED' /tmp/redaction-before.log
+        grep -q 'unreadable_annotation_rectangles_refuse_apply_without_changing_the_document ... FAILED' /tmp/redaction-before.log
+        cargo test --locked -p pdfcraft-redact --lib annotation_geometry
+        cargo check --locked -p pdfcraft-redact --target wasm32-unknown-unknown
+        cargo xtask layers
+        cargo xtask assets
+        cargo xtask parity
+        cargo fmt --all --check
