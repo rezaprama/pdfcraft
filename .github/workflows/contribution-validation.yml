@@ -19,7 +19,7 @@ jobs:
         echo 'FORMATTING PATCH END'
         cargo clippy --locked -p pdfcraft-redact -p pdfcraft-automation --all-targets -- -D warnings
         cargo test --locked -p pdfcraft-redact
-        cargo test --locked -p pdfcraft-automation --test it redact
+        cargo test --locked -p pdfcraft-automation
         cp crates/redact/src/lib.rs /tmp/redaction-fixed.rs
         git fetch --no-tags --depth=1 origin 175992b5a2045d00cdf8a20f812ea4aac522b099
         python3 - <<'PY'
