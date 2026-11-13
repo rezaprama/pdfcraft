@@ -41,8 +41,10 @@ jobs:
         red_status=$?
         set -e
         cat /tmp/redaction-before.log
+        set +e
         cargo test --locked -p pdfcraft-automation --test it redact_apply_refuses_unreadable_annotations_then_recovers_through_tools > /tmp/redaction-tools-before.log 2>&1
         tools_red_status=$?
+        set -e
         cat /tmp/redaction-tools-before.log
         cp /tmp/redaction-fixed.rs crates/redact/src/lib.rs
         test "$red_status" -eq 101
