@@ -20,6 +20,7 @@ jobs:
         cargo clippy --locked -p pdfcraft-redact --all-targets -- -D warnings
         cargo test --locked -p pdfcraft-redact
         cp crates/redact/src/lib.rs /tmp/redaction-fixed.rs
+        git fetch --no-tags --depth=1 origin 175992b5a2045d00cdf8a20f812ea4aac522b099
         python3 - <<'PY'
         from pathlib import Path
         import re, subprocess
