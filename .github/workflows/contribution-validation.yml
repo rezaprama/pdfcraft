@@ -15,10 +15,11 @@ jobs:
       command: |
         cargo fmt --all
         echo 'FORMATTING PATCH START'
-        git diff -- crates/redact
+        git diff -- crates/redact crates/automation/tests/it/automation.rs
         echo 'FORMATTING PATCH END'
-        cargo clippy --locked -p pdfcraft-redact --all-targets -- -D warnings
+        cargo clippy --locked -p pdfcraft-redact -p pdfcraft-automation --all-targets -- -D warnings
         cargo test --locked -p pdfcraft-redact
+        cargo test --locked -p pdfcraft-automation --test it redact
         cp crates/redact/src/lib.rs /tmp/redaction-fixed.rs
         git fetch --no-tags --depth=1 origin 175992b5a2045d00cdf8a20f812ea4aac522b099
         python3 - <<'PY'
@@ -40,11 +41,17 @@ jobs:
         red_status=$?
         set -e
         cat /tmp/redaction-before.log
+        cargo test --locked -p pdfcraft-automation --test it redact_apply_refuses_unreadable_annotations_then_recovers_through_tools > /tmp/redaction-tools-before.log 2>&1
+        tools_red_status=$?
+        cat /tmp/redaction-tools-before.log
         cp /tmp/redaction-fixed.rs crates/redact/src/lib.rs
         test "$red_status" -eq 101
+        test "$tools_red_status" -eq 101
         grep -q 'annotation_rectangles_do_not_skip_non_numeric_entries ... FAILED' /tmp/redaction-before.log
         grep -q 'unreadable_annotation_rectangles_refuse_apply_without_changing_the_document ... FAILED' /tmp/redaction-before.log
+        grep -q 'redact_apply_refuses_unreadable_annotations_then_recovers_through_tools ... FAILED' /tmp/redaction-tools-before.log
         cargo test --locked -p pdfcraft-redact --lib annotation_geometry
+        cargo test --locked -p pdfcraft-automation --test it redact_apply_refuses_unreadable_annotations_then_recovers_through_tools
         cargo check --locked -p pdfcraft-redact --target wasm32-unknown-unknown
         cargo xtask layers
         cargo xtask assets
