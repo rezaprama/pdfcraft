@@ -1,0 +1,16 @@
+name: README advisory validation
+on:
+  push:
+    branches: [validation/docs-7179]
+permissions:
+  contents: read
+jobs:
+  advisory:
+    uses: storytold/craft-common-actions/.github/workflows/gate.yml@main
+    with:
+      os: '["ubuntu-24.04"]'
+      tools: cargo-deny@0.20.2
+      targets: ''
+      craft-fonts-ref: ''
+      timeout-minutes: 12
+      command: cargo deny --log-level error check
